@@ -140,8 +140,10 @@ const logout = asyncHandler(async (req, res) => {
   res.cookie('jwt', '', {
     httpOnly: true,
     expires: new Date(0),
-    secure: process.env.NODE_ENV !== 'development',
-    sameSite: 'strict'
+    secure: process.env.NODE_ENV === 'production',
+    // sameSite: 'strict',
+    sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
+    path: '/' // Explicitly set the path
   });
 
   return successResponse(res, 200, null, 'User logged out successfully');
