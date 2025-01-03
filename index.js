@@ -9,6 +9,7 @@ import { courseRouter } from './routes/courses.js';
 import { adminRouter } from './routes/admin.js';
 import { studentRouter } from './routes/student.js';
 import { googleRouter } from './routes/googleRoutes.js';
+import { profileRouter } from './routes/profileRoutes.js';
 
 dotenv.config();
 const PORT = process.env.PORT || 5000;
@@ -55,6 +56,7 @@ app.use('/api/courses', courseRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/student', studentRouter);
 app.use("/auth/google", googleRouter);
+app.use('/api/profile', profileRouter);
 
 
 
