@@ -3,6 +3,7 @@ import Course from '../models/Course.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import successResponse from '../utils/successResponse.js';
 import { NotFoundError, ValidationError } from '../utils/error.js';
+import axios from 'axios';
 
 const getMyCourses = asyncHandler(async (req, res) => {
   const student = await User.findById(req.user._id)
@@ -14,7 +15,7 @@ const getMyCourses = asyncHandler(async (req, res) => {
 
   if (!student) {
     throw new NotFoundError('Student not found');
-  }  
+  }
 
   return successResponse(res, 200, student, 'My courses retrieved successfully');
 });
@@ -23,6 +24,7 @@ const toggleCompletion = asyncHandler(async (req, res) => {
   const courseId = req.params.id; // Get courseId from the URL
   const student = await User.findById(req.user._id);
 
+  const course = await Course.findById(courseId);
   if (!student) {
     throw new NotFoundError('Student not found');
   }
@@ -38,11 +40,25 @@ const toggleCompletion = asyncHandler(async (req, res) => {
 
   // Toggle the completion status
   student.enrolledCourses[enrolledCourseIndex].completed = !student.enrolledCourses[enrolledCourseIndex].completed;
-  
+
   // Update progress to 100 if completed, 0 if not
   student.enrolledCourses[enrolledCourseIndex].progress = student.enrolledCourses[enrolledCourseIndex].completed ? 100 : 0;
-  
+
   await student.save();
+
+  const emailData = {
+    studentEmail: student.email,
+    studentName: student.name,
+    courseTitle: course.title,
+  };
+
+  // console.log(`emailData:`, emailData);
+  // // console.log(`student.enrolledCourses:`, student.enrolledCourses[enrolledCourseIndex].course.title);
+  // console.log(`Course Title:`, course.title);
+  if (student.enrolledCourses[enrolledCourseIndex].completed) {
+    const response = await axios.post('https://hook.eu2.make.com/piumb3b4yx3jujg1cfkj48bf2tsjtfpz', emailData);
+    console.log('Email notification sent:', response.data);
+  }
 
   // Return updated student data with populated courses
   const updatedStudent = await User.findById(req.user._id)
@@ -138,7 +154,7 @@ const assignCourses = asyncHandler(async (req, res) => {
 });
 
 // Unassign courses from students
-const unassignCourses = asyncHandler(async (req, res) => {  
+const unassignCourses = asyncHandler(async (req, res) => {
   const { userIds, courseIds } = req.body;
 
   // Validate input
