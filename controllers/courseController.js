@@ -52,6 +52,25 @@ const createCourse = asyncHandler(async (req, res) => {
   if (!title || !description || !subject || !level || !videoUrl || !thumbnail) {
     throw new ValidationError('All fields are required');
   }
+  // Convert subject and level to lowercase
+  if (req.body.subject) {
+    req.body.subject = req.body.subject.toLowerCase();
+  }
+  if (req.body.level) {
+    req.body.level = req.body.level.toLowerCase();
+  }
+
+  // Check if title is being updated and if it already exists (excluding current course)
+  if (req.body.title) {
+    const existingCourse = await Course.findOne({
+      title: req.body.title,
+      _id: { $ne: req.params.id } // exclude current course
+    });
+
+    if (existingCourse) {
+      throw new ValidationError('A course with this title already exists');
+    }
+  }
 
   const course = await Course.create({
     title,
