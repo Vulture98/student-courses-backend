@@ -2,6 +2,7 @@ import Course from '../models/Course.js';
 // import UserCourse from '../models/userCourse.js';
 import successResponse from '../utils/successResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
+import { ValidationError } from '../utils/error.js';
 
 // Get all courses with pagination and search
 const getCourses = asyncHandler(async (req, res) => {
@@ -81,15 +82,41 @@ const getCourse = asyncHandler(async (req, res) => {
 
 // Update a course
 const updateCourse = asyncHandler(async (req, res) => {
+  // Convert subject and level to lowercase
+  if (req.body.subject) {
+    req.body.subject = req.body.subject.toLowerCase();
+  }
+  if (req.body.level) {
+    req.body.level = req.body.level.toLowerCase();
+  }
+
+  // Check if title is being updated and if it already exists (excluding current course)
+  if (req.body.title) {
+    const existingCourse = await Course.findOne({
+      title: req.body.title,
+      _id: { $ne: req.params.id } // exclude current course
+    });
+
+    if (existingCourse) {
+      throw new ValidationError('A course with this title already exists');
+    }
+  }
+
   const course = await Course.findByIdAndUpdate(
     req.params.id,
     req.body,
     { new: true, runValidators: true }
   );
+
   if (!course) {
-    return res.status(404).json({ message: 'Course not found' });
+    // return res.status(404).json({
+    //   success: false,
+    //   message: 'Course not found'
+    // });
+    throw new ValidationError('Course not found');
   }
-  return successResponse(res, 200, course);
+
+  return successResponse(res, 200, course, "successfully updated");
 });
 
 // Delete a course
@@ -170,6 +197,6 @@ export {
   getCourse,
   updateCourse,
   deleteCourse,
-  toggleSuspended,  
+  toggleSuspended,
   bulkCreateCourses,
 }
