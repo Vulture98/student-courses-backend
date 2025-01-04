@@ -14,7 +14,10 @@ const courseSchema = new mongoose.Schema({
   subject: {
     type: String,
     required: [true, 'Please provide a subject'],
-    enum: ['physics', 'mathematics', 'chemistry', 'biology', 'computer science', 'literature', 'history', 'economics', 'environmental science', 'psychology'],
+    enum: {
+      values: ['physics', 'mathematics', 'chemistry', 'biology', 'computer science', 'literature', 'history', 'economics', 'environmental science', 'psychology'],
+      message: '{VALUE} is not a valid subject'
+    },
     lowercase: true
   },
   level: {
