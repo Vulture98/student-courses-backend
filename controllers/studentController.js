@@ -56,8 +56,8 @@ const toggleCompletion = asyncHandler(async (req, res) => {
   // // console.log(`student.enrolledCourses:`, student.enrolledCourses[enrolledCourseIndex].course.title);
   // console.log(`Course Title:`, course.title);
   if (student.enrolledCourses[enrolledCourseIndex].completed) {
-    const response = await axios.post('https://hook.eu2.make.com/piumb3b4yx3jujg1cfkj48bf2tsjtfpz', emailData);
-    console.log('Email notification sent:', response.data);
+    const response = await axios.post(process.env.MAKE_WEBHOOK_URL, emailData);
+    console.log(`Email notification sent:`, response.data);
   }
 
   // Return updated student data with populated courses
