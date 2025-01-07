@@ -64,6 +64,12 @@ class ServiceUnavailableError extends CustomError {
   }
 }
 
+class BadRequestError extends CustomError {
+  constructor(message = 'Bad request') {
+    super(message, 400);
+  }
+}
+
 export {
   CustomError,
   ConflictError,
@@ -73,6 +79,7 @@ export {
   ForbiddenError,
   RateLimitError,
   ServiceUnavailableError,
+  BadRequestError
 };
 
 // export default CustomError;

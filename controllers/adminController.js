@@ -2,7 +2,8 @@ import User from '../models/User.js';
 import Course from '../models/Course.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import successResponse from '../utils/successResponse.js';
-import { NotFoundError } from '../utils/error.js';
+import { NotFoundError, BadRequestError } from '../utils/error.js';
+import { notifyStudent } from '../config/socketManager.js';
 
 // Get all users (Admin only)
 const getStudents = asyncHandler(async (req, res) => {
@@ -122,14 +123,68 @@ const toggleCourseSuspension = asyncHandler(async (req, res) => {
 });
 
 // Assign courses to a student
+const assignCoursesToStudent = asyncHandler(async (req, res) => {
+  console.log('\n=== ASSIGNING COURSES ===');
+  const { studentId, courseIds } = req.body;
+  console.log('studentId:', studentId);
+  console.log('courseIds:', courseIds);
+
+  if (!studentId || !courseIds || !Array.isArray(courseIds)) {
+    throw new BadRequestError('Please provide student ID and course IDs');
+  }
+
+  // Find student
+  const student = await User.findOne({ _id: studentId, role: 'student' });
+  if (!student) {
+    throw new NotFoundError('Student not found');
+  }
+  console.log('Found student:', student.name);
+
+  // Find courses
+  const courses = await Course.find({ _id: { $in: courseIds } });
+  console.log('Found courses:', courses.map(c => c.title));
+  
+  // Update student's enrolled courses
+  const updatedStudent = await User.findByIdAndUpdate(
+    studentId,
+    { $addToSet: { enrolledCourses: { $each: courseIds } } },
+    { new: true }
+  ).populate('enrolledCourses');
+
+  // Notify student about each assigned course
+  console.log('\n=== SENDING NOTIFICATIONS ===');
+  for (const course of courses) {
+    console.log(`Sending notification for course: ${course.title}`);
+    notifyStudent(studentId, {
+      title: course.title,
+      _id: course._id,
+      description: course.description
+    });
+  }
+  console.log('=== NOTIFICATIONS SENT ===\n');
+
+  return successResponse(res, 200, updatedStudent, 'Courses assigned successfully');
+});
+
+// Assign courses to students
 const assignCourses = asyncHandler(async (req, res) => {
+  console.log('\n=== BULK ASSIGNING COURSES ===');
   const { studentIds, courseIds } = req.body;
+  console.log('studentIds:', studentIds);
+  console.log('courseIds:', courseIds);
 
   // Handle single student ID passed as string
   const studentIdArray = Array.isArray(studentIds) ? studentIds : [studentIds];
 
-  // Validate courses exist
+  // Validate input
+  if (!studentIdArray.length || !courseIds || !Array.isArray(courseIds)) {
+    throw new BadRequestError('Please provide student IDs and course IDs');
+  }
+
+  // Find all courses first
   const courses = await Course.find({ _id: { $in: courseIds } });
+  console.log('Found courses:', courses.map(c => c.title));
+
   if (courses.length !== courseIds.length) {
     throw new BadRequestError('One or more courses not found');
   }
@@ -139,6 +194,7 @@ const assignCourses = asyncHandler(async (req, res) => {
   if (students.length === 0) {
     throw new NotFoundError('No students found');
   }
+  console.log('Found students:', students.map(s => s.name));
 
   let assignedCount = 0;
   let alreadyAssignedCount = 0;
@@ -175,6 +231,25 @@ const assignCourses = asyncHandler(async (req, res) => {
       ).populate({
         path: 'enrolledCourses.course',
         select: 'title subject videoUrl thumbnail description level'
+      });
+
+      // Send a single notification for all new courses
+      console.log(`\n=== SENDING NOTIFICATIONS TO STUDENT ${student.name} ===`);
+      const assignedCourses = newCourseIds.map(courseId => {
+        const course = courses.find(c => c._id.toString() === courseId.toString());
+        return {
+          _id: course._id,
+          title: course.title,
+          description: course.description,
+          subject: course.subject,
+          level: course.level
+        };
+      });
+
+      notifyStudent(student._id, {
+        message: `${assignedCourses.length} new course${assignedCourses.length > 1 ? 's' : ''} assigned`,
+        courses: assignedCourses,
+        timestamp: new Date().toISOString()
       });
 
       assignedCount++;
@@ -336,6 +411,7 @@ export {
   getStudent,
   toggleUserSuspension,
   toggleCourseSuspension,
+  assignCoursesToStudent,
   assignCourses,
   unassignCourses,
   deleteStudent
