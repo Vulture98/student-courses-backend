@@ -4,6 +4,7 @@ import asyncHandler from '../utils/asyncHandler.js';
 import successResponse from '../utils/successResponse.js';
 import { NotFoundError, BadRequestError } from '../utils/error.js';
 import { notifyStudent } from '../config/socketManager.js';
+import Notification from '../models/Notification.js';
 
 // Get all users (Admin only)
 const getStudents = asyncHandler(async (req, res) => {
@@ -147,9 +148,22 @@ const assignCoursesToStudent = asyncHandler(async (req, res) => {
   // Update student's enrolled courses
   const updatedStudent = await User.findByIdAndUpdate(
     studentId,
-    { $addToSet: { enrolledCourses: { $each: courseIds } } },
+    {
+      $push: { 
+        enrolledCourses: { 
+          $each: courseIds.map(courseId => ({
+            course: courseId,
+            progress: 0,
+            completed: false
+          }))
+        } 
+      }
+    },
     { new: true }
-  ).populate('enrolledCourses');
+  ).populate({
+    path: 'enrolledCourses.course',
+    select: 'title subject videoUrl thumbnail description level'
+  });
 
   // Notify student about each assigned course
   console.log('\n=== SENDING NOTIFICATIONS ===');
@@ -225,7 +239,11 @@ const assignCourses = asyncHandler(async (req, res) => {
       const updatedStudent = await User.findByIdAndUpdate(
         student._id,
         {
-          $push: { enrolledCourses: { $each: newEnrollments } }
+          $push: { 
+            enrolledCourses: { 
+              $each: newEnrollments
+            } 
+          }
         },
         { new: true }
       ).populate({
@@ -233,24 +251,50 @@ const assignCourses = asyncHandler(async (req, res) => {
         select: 'title subject videoUrl thumbnail description level'
       });
 
-      // Send a single notification for all new courses
+      // Send notifications for each new course
       console.log(`\n=== SENDING NOTIFICATIONS TO STUDENT ${student.name} ===`);
-      const assignedCourses = newCourseIds.map(courseId => {
-        const course = courses.find(c => c._id.toString() === courseId.toString());
-        return {
-          _id: course._id,
-          title: course.title,
-          description: course.description,
-          subject: course.subject,
-          level: course.level
-        };
-      });
+      if (newCourseIds.length > 0) {
+        const assignedCourses = newCourseIds.map(courseId => {
+          const course = courses.find(c => c._id.toString() === courseId.toString());
+          return {
+            _id: course._id,
+            title: course.title,
+            description: course.description,
+            subject: course.subject,
+            level: course.level
+          };
+        });
 
-      notifyStudent(student._id, {
-        message: `${assignedCourses.length} new course${assignedCourses.length > 1 ? 's' : ''} assigned`,
-        courses: assignedCourses,
-        timestamp: new Date().toISOString()
-      });
+        const notificationData = {
+          message: `${assignedCourses.length} new course${assignedCourses.length > 1 ? 's' : ''} assigned`,
+          data: {
+            courses: assignedCourses
+          },
+          timestamp: new Date().toISOString()
+        };
+
+        // Store notification in database
+        try {
+          await Notification.create({
+            userId: student._id,
+            message: notificationData.message,
+            type: 'COURSE_ASSIGNED',
+            data: notificationData.data,
+            createdAt: notificationData.timestamp
+          });
+          console.log('Notification stored in database');
+        } catch (error) {
+          console.error('Failed to store notification:', error);
+        }
+
+        // Send real-time notification if user is online
+        try {
+          notifyStudent(student._id, notificationData);
+          console.log('Real-time notification sent');
+        } catch (error) {
+          console.error('Failed to send real-time notification:', error);
+        }
+      }
 
       assignedCount++;
       results.push({
