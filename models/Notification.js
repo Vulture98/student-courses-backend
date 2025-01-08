@@ -12,7 +12,7 @@ const notificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['COURSE_ASSIGNED', 'COURSE_REMOVED', 'SYSTEM'],
+    enum: ['COURSE_ASSIGNED', 'COURSE_UNASSIGNED', 'COURSE_REMOVED', 'SYSTEM'],
     default: 'SYSTEM'
   },
   data: {

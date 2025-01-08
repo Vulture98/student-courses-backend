@@ -337,13 +337,21 @@ const assignCourses = asyncHandler(async (req, res) => {
 
 // Unassign courses from students
 const unassignCourses = asyncHandler(async (req, res) => {
+  console.log('\n=== BULK UNASSIGNING COURSES ===');
   const { studentIds, courseIds } = req.body;
+  console.log('studentIds:', studentIds);
+  console.log('courseIds:', courseIds);
 
-  // Handle single student ID passed as string
-  const studentIdArray = Array.isArray(studentIds) ? studentIds : [studentIds];
+  if (!studentIds || !courseIds || !Array.isArray(studentIds) || !Array.isArray(courseIds)) {
+    throw new BadRequestError('Invalid input: studentIds and courseIds must be arrays');
+  }
 
-  // Validate courses exist
-  const courses = await Course.find({ _id: { $in: courseIds } });
+  // Convert IDs to strings for comparison
+  const studentIdArray = studentIds.map(id => id.toString());
+  const courseIdArray = courseIds.map(id => id.toString());
+
+  // Find all courses first to get their details
+  const courses = await Course.find({ _id: { $in: courseIdArray } });
   if (courses.length !== courseIds.length) {
     throw new BadRequestError('One or more courses not found');
   }
@@ -353,6 +361,7 @@ const unassignCourses = asyncHandler(async (req, res) => {
   if (students.length === 0) {
     throw new NotFoundError('No students found');
   }
+  console.log('Found students:', students.map(s => s.name));
 
   let unassignedCount = 0;
   let notEnrolledCount = 0;
@@ -361,67 +370,112 @@ const unassignCourses = asyncHandler(async (req, res) => {
   // Process each student
   for (const student of students) {
     // Get current enrolled course IDs for this student
-    const currentCourseIds = student.enrolledCourses.map(enrollment => 
-      enrollment.course.toString()
-    );
-
-    // Filter courses that are actually enrolled
-    const enrolledCourseIds = courseIds.filter(id => 
-      currentCourseIds.includes(id.toString())
+    const currentEnrollments = student.enrolledCourses;
+    const coursesToRemove = currentEnrollments.filter(enrollment =>
+      courseIdArray.includes(enrollment.course.toString())
     );
 
     // If this student has courses to unassign
-    if (enrolledCourseIds.length > 0) {
-      // Remove specified courses from enrolledCourses
+    if (coursesToRemove.length > 0) {
+      // Remove courses from student's enrolledCourses
       const updatedStudent = await User.findByIdAndUpdate(
         student._id,
         {
-          $pull: { 
-            enrolledCourses: { 
-              'course': { $in: enrolledCourseIds }
+          $pull: {
+            enrolledCourses: {
+              course: { $in: courseIdArray }
             }
           }
         },
-        { 
-          new: true,
-          runValidators: true 
-        }
+        { new: true }
       ).populate({
         path: 'enrolledCourses.course',
         select: 'title subject videoUrl thumbnail description level'
       });
 
+      // Prepare notification for removed courses
+      console.log(`\n=== SENDING NOTIFICATIONS TO STUDENT ${student.name} ===`);
+      const unassignedCourses = coursesToRemove.map(enrollment => {
+        const course = courses.find(c => c._id.toString() === enrollment.course.toString());
+        return {
+          _id: course._id,
+          title: course.title,
+          description: course.description,
+          subject: course.subject,
+          level: course.level
+        };
+      });
+
+      console.log('\n=== CREATING NOTIFICATION ===');
+      console.log('Unassigned courses:', unassignedCourses);
+
+      const notificationData = {
+        message: `${unassignedCourses.length} course${unassignedCourses.length > 1 ? 's' : ''} removed from your list`,
+        type: 'COURSE_UNASSIGNED',
+        data: {
+          courses: unassignedCourses
+        },
+        timestamp: new Date().toISOString(),
+        read: false
+      };
+
+      console.log('Notification data:', notificationData);
+
+      // Store notification in database
+      try {
+        await Notification.create({
+          userId: student._id,
+          message: notificationData.message,
+          type: notificationData.type,
+          data: notificationData.data,
+          read: notificationData.read,
+          createdAt: notificationData.timestamp
+        });
+        console.log('Notification stored in database');
+      } catch (error) {
+        console.error('Failed to store notification:', error);
+      }
+
+      // Send real-time notification if user is online
+      try {
+        notifyStudent(student._id, notificationData);
+        console.log('Real-time notification sent');
+      } catch (error) {
+        console.error('Failed to send real-time notification:', error);
+      }
+
       unassignedCount++;
       results.push({
         studentId: student._id,
-        name: student.name,
-        unassigned: enrolledCourseIds.length,
-        notEnrolled: courseIds.length - enrolledCourseIds.length
+        studentName: student.name,
+        unassignedCourses: unassignedCourses.length,
+        notEnrolled: courseIds.length - unassignedCourses.length
       });
     } else {
       notEnrolledCount++;
       results.push({
         studentId: student._id,
-        name: student.name,
-        unassigned: 0,
+        studentName: student.name,
+        unassignedCourses: 0,
         notEnrolled: courseIds.length
       });
     }
   }
 
-  // Determine appropriate response
-  if (notEnrolledCount === students.length) {
-    // None of the students were enrolled in any of the courses
-    return successResponse(res, 400, { results }, 'None of the selected students were enrolled in the selected courses');
+  // Prepare response message
+  if (unassignedCount === 0) {
+    // No courses were unassigned
+    const message = students.length === 1
+      ? 'Student was not enrolled in any of the specified courses'
+      : 'No students were enrolled in the specified courses';
+    return successResponse(res, 200, { results }, message);
   } else if (unassignedCount > 0) {
     // Some students had courses unassigned
     const message = students.length === 1
-      ? `Successfully unassigned ${courseIds.length - results[0].notEnrolled} courses from student`
+      ? `Successfully unassigned ${results[0].unassignedCourses} courses from student`
       : `Successfully unassigned courses from ${unassignedCount} out of ${students.length} students`;
     return successResponse(res, 200, { results }, message);
   }
-
-  return successResponse(res, 400, { results }, 'No courses were unassigned');
 });
 
 // Delete a student

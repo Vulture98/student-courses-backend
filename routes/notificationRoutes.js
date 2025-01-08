@@ -6,15 +6,30 @@ import successResponse from '../utils/successResponse.js';
 
 const router = express.Router();
 
-// Get unread notifications
+// Get notifications (unread + 5 read)
 router.get('/', authenticate, asyncHandler(async (req, res) => {
   console.log('\n=== FETCHING NOTIFICATIONS ===');
-  const notifications = await Notification.find({
+  console.log('User ID:', req.user._id);
+  
+  // Get unread notifications
+  const unreadNotifications = await Notification.find({
     userId: req.user._id,
     read: false
   })
-  .sort('-createdAt')
-  .lean(); // Use lean() for better performance
+  .sort({ createdAt: -1 })
+  .lean();
+
+  // Get last 5 read notifications
+  const readNotifications = await Notification.find({
+    userId: req.user._id,
+    read: true
+  })
+  .sort({ createdAt: -1 })
+  .limit(5)
+  .lean();
+
+  // Combine both
+  const notifications = [...unreadNotifications, ...readNotifications];
   
   console.log('Found notifications:', notifications);
   return successResponse(res, 200, notifications, 'Notifications retrieved successfully');
@@ -22,11 +37,15 @@ router.get('/', authenticate, asyncHandler(async (req, res) => {
 
 // Mark all notifications as read
 router.put('/read', authenticate, asyncHandler(async (req, res) => {
-  await Notification.updateMany(
+  console.log('\n=== MARKING ALL NOTIFICATIONS AS READ ===');
+  console.log('User ID:', req.user._id);
+  
+  const result = await Notification.updateMany(
     { userId: req.user._id, read: false },
     { read: true }
   );
   
+  console.log('Updated notifications:', result.modifiedCount);
   return successResponse(res, 200, null, 'Notifications marked as read');
 }));
 
