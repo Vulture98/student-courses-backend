@@ -22,9 +22,9 @@ const getStudents = asyncHandler(async (req, res) => {
 const getUserStats = asyncHandler(async (req, res) => {
   const totalUsers = await User.countDocuments({ role: 'student' });
   const totalCourses = await Course.countDocuments();
-  const suspendedUsers = await User.countDocuments({ 
+  const suspendedUsers = await User.countDocuments({
     role: 'student',
-    isSuspended: true 
+    isSuspended: true
   });
   const suspendedCourses = await Course.countDocuments({ isSuspended: true });
 
@@ -82,14 +82,14 @@ const getStudent = asyncHandler(async (req, res) => {
 });
 
 // Suspend/Unsuspend user
-const toggleUserSuspension = asyncHandler(async (req, res) => {  
-  const user = await User.findById(req.params.id);  
+const toggleUserSuspension = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id);
 
   if (!user) return res.status(404).json({ success: false, message: 'User not found' });
   if (user.role === 'admin') return res.status(400).json({ success: false, message: 'Cannot suspend admin users' });
 
   user.isSuspended = !user.isSuspended;
-  await user.save();  
+  await user.save();
   const formattedUser = {
     name: user.name,
     email: user.email,
@@ -144,19 +144,19 @@ const assignCoursesToStudent = asyncHandler(async (req, res) => {
   // Find courses
   const courses = await Course.find({ _id: { $in: courseIds } });
   console.log('Found courses:', courses.map(c => c.title));
-  
+
   // Update student's enrolled courses
   const updatedStudent = await User.findByIdAndUpdate(
     studentId,
     {
-      $push: { 
-        enrolledCourses: { 
+      $push: {
+        enrolledCourses: {
           $each: courseIds.map(courseId => ({
             course: courseId,
             progress: 0,
             completed: false
           }))
-        } 
+        }
       }
     },
     { new: true }
@@ -217,12 +217,12 @@ const assignCourses = asyncHandler(async (req, res) => {
   // Process each student
   for (const student of students) {
     // Get current enrolled course IDs for this student
-    const currentCourseIds = student.enrolledCourses.map(enrollment => 
+    const currentCourseIds = student.enrolledCourses.map(enrollment =>
       enrollment.course.toString()
     );
 
     // Filter out courses that are already assigned to this student
-    const newCourseIds = courseIds.filter(id => 
+    const newCourseIds = courseIds.filter(id =>
       !currentCourseIds.includes(id.toString())
     );
 
@@ -239,10 +239,10 @@ const assignCourses = asyncHandler(async (req, res) => {
       const updatedStudent = await User.findByIdAndUpdate(
         student._id,
         {
-          $push: { 
-            enrolledCourses: { 
+          $push: {
+            enrolledCourses: {
               $each: newEnrollments
-            } 
+            }
           }
         },
         { new: true }
@@ -269,10 +269,13 @@ const assignCourses = asyncHandler(async (req, res) => {
         console.log('Assigned courses:', assignedCourses);
 
         const notificationData = {
-          message: `${assignedCourses.length} new course${assignedCourses.length > 1 ? 's' : ''} assigned`,
+          message: `${assignedCourses.length} course${assignedCourses.length > 1 ? 's' : ''} assigned`,
           type: 'COURSE_ASSIGNED',
           data: {
-            courses: assignedCourses
+            courses: assignedCourses.map(c => ({
+              _id: c._id,
+              title: c.title
+            }))
           },
           timestamp: new Date().toISOString()
         };
@@ -410,13 +413,15 @@ const unassignCourses = asyncHandler(async (req, res) => {
       console.log('Unassigned courses:', unassignedCourses);
 
       const notificationData = {
-        message: `${unassignedCourses.length} course${unassignedCourses.length > 1 ? 's' : ''} removed from your list`,
+        message: `${unassignedCourses.length} course${unassignedCourses.length > 1 ? 's' : ''} removed`,
         type: 'COURSE_UNASSIGNED',
         data: {
-          courses: unassignedCourses
+          courses: unassignedCourses.map(c => ({
+            _id: c._id,
+            title: c.title
+          }))
         },
-        timestamp: new Date().toISOString(),
-        read: false
+        timestamp: new Date().toISOString()
       };
 
       console.log('Notification data:', notificationData);
@@ -428,7 +433,6 @@ const unassignCourses = asyncHandler(async (req, res) => {
           message: notificationData.message,
           type: notificationData.type,
           data: notificationData.data,
-          read: notificationData.read,
           createdAt: notificationData.timestamp
         });
         console.log('Notification stored in database');
@@ -481,10 +485,10 @@ const unassignCourses = asyncHandler(async (req, res) => {
 // Delete a student
 const deleteStudent = asyncHandler(async (req, res) => {
   const studentId = req.params.id;
-  
+
   // Find student first to ensure they exist
   const student = await User.findOne({ _id: studentId, role: 'student' });
-  
+
   if (!student) {
     return res.status(404).json({
       success: false,
