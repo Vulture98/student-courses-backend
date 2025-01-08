@@ -43,20 +43,25 @@ export const getIO = () => {
   return io;
 };
 
-export const notifyStudent = (studentId, data) => {
-  console.log('\n=== NOTIFICATION MANAGER ===');
-  if (!io) {
-    console.error('Socket.io not initialized when trying to notify student');
-    return;
+export const notifyStudent = (studentId, notification) => {
+  console.log('\n=== SENDING SOCKET NOTIFICATION ===');
+  console.log('To student:', studentId);
+  console.log('Notification:', notification);
+
+  if (io) {
+    // Ensure consistent data structure with stored notifications
+    const socketNotification = {
+      id: Date.now().toString(),
+      message: notification.message,
+      type: notification.type || 'COURSE_ASSIGNED',
+      data: {
+        courses: notification.data?.courses || []
+      },
+      timestamp: notification.timestamp,
+      read: false
+    };
+
+    console.log('Formatted notification:', socketNotification);
+    io.to(`student:${studentId}`).emit('courseAssigned', socketNotification);
   }
-  
-  console.log(`Sending to room: student:${studentId}`);
-  console.log('Notification data:', data);
-  
-  io.to(`student:${studentId}`).emit('courseAssigned', {
-    message: data.message,
-    courses: data.courses,
-    timestamp: data.timestamp
-  });
-  console.log('=== NOTIFICATION SENT ===\n');
 };

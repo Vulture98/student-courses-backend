@@ -265,20 +265,26 @@ const assignCourses = asyncHandler(async (req, res) => {
           };
         });
 
+        console.log('\n=== CREATING NOTIFICATION ===');
+        console.log('Assigned courses:', assignedCourses);
+
         const notificationData = {
           message: `${assignedCourses.length} new course${assignedCourses.length > 1 ? 's' : ''} assigned`,
+          type: 'COURSE_ASSIGNED',
           data: {
             courses: assignedCourses
           },
           timestamp: new Date().toISOString()
         };
 
+        console.log('Notification data:', notificationData);
+
         // Store notification in database
         try {
           await Notification.create({
             userId: student._id,
             message: notificationData.message,
-            type: 'COURSE_ASSIGNED',
+            type: notificationData.type,
             data: notificationData.data,
             createdAt: notificationData.timestamp
           });

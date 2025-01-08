@@ -8,11 +8,15 @@ const router = express.Router();
 
 // Get unread notifications
 router.get('/', authenticate, asyncHandler(async (req, res) => {
+  console.log('\n=== FETCHING NOTIFICATIONS ===');
   const notifications = await Notification.find({
     userId: req.user._id,
     read: false
-  }).sort('-createdAt');
+  })
+  .sort('-createdAt')
+  .lean(); // Use lean() for better performance
   
+  console.log('Found notifications:', notifications);
   return successResponse(res, 200, notifications, 'Notifications retrieved successfully');
 }));
 
