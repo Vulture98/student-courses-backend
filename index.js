@@ -2,28 +2,32 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
+import { createServer } from 'http';
 import apiResponse from './utils/apiResponse.js';
 import connectDB from './config/db.js';
+import { initializeSocket } from './config/socketManager.js';
 import { authRouter } from './routes/auth.js';
 import { courseRouter } from './routes/courses.js';
 import { adminRouter } from './routes/admin.js';
 import { studentRouter } from './routes/student.js';
 import { googleRouter } from './routes/googleRoutes.js';
 import { profileRouter } from './routes/profileRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 
 dotenv.config();
 const PORT = process.env.PORT || 5000;
 connectDB();
 
 const app = express();
+const httpServer = createServer(app);
+
+// Initialize Socket.io
+const io = initializeSocket(httpServer);
 
 // Middleware
 app.use(express.json());
 app.use(cookieParser());
-// app.use(cors({
-//   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-//   credentials: true
-// }));
+
 const allowedOrigins = [
   "https://student-courses-frontend.vercel.app",
   "http://localhost:5173",
@@ -52,15 +56,12 @@ app.use(
 
 // Mount routes
 app.use('/api/auth', authRouter);
-app.use('/api/courses', courseRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/courses', courseRouter);
 app.use('/api/student', studentRouter);
 app.use("/auth/google", googleRouter);
 app.use('/api/profile', profileRouter);
-
-
-
-
+app.use('/api/notifications', notificationRoutes);
 
 app.get("/", (req, res) => {
   res.send("Hello Welcome to Courses API");
@@ -68,8 +69,6 @@ app.get("/", (req, res) => {
 
 // Global error handling middleware
 app.use((err, req, res, next) => {
-  // console.log(`inside global err() `);
-  // console.log(`inside global err(): ${err} `);
   err.statusCode = err.statusCode || 500;
   err.status = err.status || 'error';
 
@@ -85,4 +84,7 @@ app.use((err, req, res, next) => {
   );
 });
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// Start server
+httpServer.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
