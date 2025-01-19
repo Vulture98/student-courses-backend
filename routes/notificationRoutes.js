@@ -6,20 +6,16 @@ import successResponse from '../utils/successResponse.js';
 
 const router = express.Router();
 
-// Get notifications (unread + 5 read)
 router.get('/', authenticate, asyncHandler(async (req, res) => {
-  console.log('\n=== FETCHING NOTIFICATIONS ===');
-  console.log('User ID:', req.user._id);
-  
-  // Get unread notifications
+  console.log('Fetching notifications for user:', req.user._id);
+    
   const unreadNotifications = await Notification.find({
     userId: req.user._id,
     read: false
   })
   .sort({ createdAt: -1 })
   .lean();
-
-  // Get last 5 read notifications
+  
   const readNotifications = await Notification.find({
     userId: req.user._id,
     read: true
@@ -27,36 +23,40 @@ router.get('/', authenticate, asyncHandler(async (req, res) => {
   .sort({ createdAt: -1 })
   .limit(5)
   .lean();
-
-  // Combine both
-  const notifications = [...unreadNotifications, ...readNotifications];
   
-  console.log('Found notifications:', notifications);
-  return successResponse(res, 200, notifications, 'Notifications retrieved successfully');
+  const notifications = [...unreadNotifications, ...readNotifications];
+  console.log('Found notifications:', notifications.length);
+  
+  return successResponse(res, 200, notifications);
 }));
 
-// Mark all notifications as read
 router.put('/read', authenticate, asyncHandler(async (req, res) => {
-  console.log('\n=== MARKING ALL NOTIFICATIONS AS READ ===');
-  console.log('User ID:', req.user._id);
+  console.log('Marking all notifications as read for:', req.user._id);
   
-  const result = await Notification.updateMany(
+  await Notification.updateMany(
     { userId: req.user._id, read: false },
     { read: true }
   );
   
-  console.log('Updated notifications:', result.modifiedCount);
   return successResponse(res, 200, null, 'Notifications marked as read');
 }));
 
-// Mark specific notifications as read
 router.put('/:id/read', authenticate, asyncHandler(async (req, res) => {
+  console.log('Marking notification as read:', req.params.id);
+  
   const notification = await Notification.findOneAndUpdate(
     { _id: req.params.id, userId: req.user._id },
     { read: true },
     { new: true }
   );
-  
+
+  if (!notification) {
+    return res.status(404).json({ 
+      success: false, 
+      error: 'Notification not found' 
+    });
+  }
+
   return successResponse(res, 200, notification, 'Notification marked as read');
 }));
 

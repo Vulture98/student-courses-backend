@@ -3,8 +3,6 @@ import { Server } from 'socket.io';
 let io;
 
 export const initializeSocket = (server) => {
-  console.log('\n=== INITIALIZING SOCKET.IO SERVER ===');
-  
   io = new Server(server, {
     cors: {
       origin: process.env.FRONTEND_URL || 'http://localhost:5173',
@@ -14,22 +12,17 @@ export const initializeSocket = (server) => {
   });
 
   io.on('connection', (socket) => {
-    console.log('\n=== NEW CLIENT CONNECTED ===');
-    console.log('Socket ID:', socket.id);
-
-    // Store student ID when they connect
+    console.log('Socket connected:', socket.id);
+    
     socket.on('authenticate', (studentId) => {
-      console.log(`\n=== STUDENT AUTHENTICATED ===`);
-      console.log(`Student ID: ${studentId}`);
-      console.log(`Socket ID: ${socket.id}`);
+      console.log('Student authenticated:', studentId);
       socket.studentId = studentId;
       socket.join(`student:${studentId}`);
       console.log(`Joined room: student:${studentId}`);
     });
 
     socket.on('disconnect', () => {
-      console.log('\n=== CLIENT DISCONNECTED ===');
-      console.log('Socket ID:', socket.id);
+      console.log('Socket disconnected:', socket.id);
     });
   });
 
@@ -44,24 +37,17 @@ export const getIO = () => {
 };
 
 export const notifyStudent = (studentId, notification) => {
-  console.log('\n=== SENDING SOCKET NOTIFICATION ===');
-  console.log('To student:', studentId);
-  console.log('Notification:', notification);
+  console.log('Sending notification:', { to: studentId, type: notification.type });
 
-  if (io) {
-    // Ensure consistent data structure with stored notifications
+  if (io) {    
     const socketNotification = {
       id: Date.now().toString(),
       message: notification.message,
-      type: notification.type || 'COURSE_ASSIGNED',
-      data: {
-        courses: notification.data?.courses || []
-      },
-      timestamp: notification.timestamp,
-      read: false
+      type: notification.type,
+      data: notification.data,
+      timestamp: new Date().toISOString()
     };
 
-    console.log('Formatted notification:', socketNotification);
-    io.to(`student:${studentId}`).emit('courseAssigned', socketNotification);
+    io.to(`student:${studentId}`).emit(`${notification.type.toLowerCase()}`, socketNotification);
   }
 };

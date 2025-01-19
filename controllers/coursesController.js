@@ -7,8 +7,7 @@ import successResponse from '../utils/successResponse.js';
 const createCourse = asyncHandler(async (req, res) => {
   req.body.createdBy = req.user.id;
   const course = await Course.create(req.body);
-  // res.status(201).json({ success: true, data: course });
-  return successResponse(res, 201, course, 'Course created successfully');
+  return successResponse(res, 201, course, 'Course added!');
 });
 
 const createMultipleCourses = asyncHandler(async (req, res) => {
@@ -26,7 +25,7 @@ const createMultipleCourses = asyncHandler(async (req, res) => {
   const formattedCourses = [{ count: courses.length }, ...courses];
 
   // Return success response
-  return successResponse(res, 201, formattedCourses, 'Courses created successfully');
+  return successResponse(res, 201, formattedCourses, 'All courses added!');
 });
 
 // Get all courses (Admin sees all, Students see only enrolled)
@@ -44,8 +43,7 @@ const getCourses = asyncHandler(async (req, res) => {
 
   const courses = await query.populate('createdBy', 'name email');
   const formattedCourses = [{count: courses.length}, ...courses];
-  // res.status(200).json({ success: true, count: courses.length, data: courses });
-  return successResponse(res, 200, formattedCourses, `Courses retrieved successfully - ${req.user.role}`);
+  return successResponse(res, 200, formattedCourses, 'Got courses');
 });
 
 // Get single course
@@ -64,8 +62,7 @@ const getCourse = asyncHandler(async (req, res) => {
     return res.status(403).json({ success: false, message: 'Not enrolled in this course' });
   }
 
-  // res.status(200).json({ success: true, data: course });
-  return successResponse(res, 200, course, 'Course retrieved successfully');
+  return successResponse(res, 200, course, 'Got course');
 
 });
 
@@ -82,8 +79,7 @@ const updateCourse = asyncHandler(async (req, res) => {
     runValidators: true
   });
 
-  // res.status(200).json({ success: true, data: course });
-  return successResponse(res, 200, course, 'Course updated successfully');
+  return successResponse(res, 200, course, 'Course updated!');
 
 });
 
@@ -96,8 +92,7 @@ const deleteCourse = asyncHandler(async (req, res) => {
   }
 
   await course.remove();
-  // res.status(200).json({ success: true, message: 'Course deleted successfully' });
-  return successResponse(res, 204, null, 'Course deleted successfully');
+  return successResponse(res, 204, null, 'Course deleted!');
 
 });
 
@@ -134,9 +129,7 @@ const updateCourseStats = asyncHandler(async (req, res) => {
 
   await Promise.all([course.save(), user.save()]);
 
-  // res.status(200).json({ success: true, message: 'Stats updated successfully' });
-  return successResponse(res, 200, course, 'Stats updated successfully');
-
+  return successResponse(res, 200, course, 'Stats updated!');
 });
 
 // export {
