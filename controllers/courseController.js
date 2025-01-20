@@ -141,6 +141,15 @@ const updateCourse = asyncHandler(async (req, res) => {
 // Delete a course
 const deleteCourse = asyncHandler(async (req, res) => {
   const course = await Course.findById(req.params.id);
+
+  // Check if admin is temporary admin
+  if (req.user.tempAdmin) {
+    return res.status(403).json({
+      success: false,
+      error: 'u need to be a super admin to delete a student/course'
+    });
+  }
+
   if (!course) {
     return res.status(404).json({ message: 'Course not found' });
   }

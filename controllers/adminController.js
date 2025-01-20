@@ -419,6 +419,14 @@ const unassignCourses = asyncHandler(async (req, res) => {
 const deleteStudent = asyncHandler(async (req, res) => {
   const studentId = req.params.id;
   
+  // Check if admin is temporary admin
+  if (req.user.tempAdmin) {
+    return res.status(403).json({
+      success: false,
+      error: 'u need to be a super admin to delete a student/course'
+    });
+  }
+
   const student = await User.findOne({ _id: studentId, role: 'student' });
   if (!student) {
     return res.status(404).json({

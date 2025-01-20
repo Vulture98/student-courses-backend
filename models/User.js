@@ -6,6 +6,7 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   role: { type: String, enum: ['student', 'admin'], default: 'student' },
+  tempAdmin: { type: Boolean, default: false },
   subject: { type: String, enum: ['physics', 'mathematics', 'chemistry', 'biology', 'computer science', 'literature', 'history', 'economics', 'environmental science', 'psychology'] },
   enrolledCourses: [{
     course: { type: mongoose.Schema.Types.ObjectId, ref: 'Course' },
